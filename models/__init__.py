@@ -1,2 +1,5 @@
 #!/usr/bin/python3
-"""Initialize models package"""
+"""
+Initialize the models package
+"""
+from models.base_model import BaseModel
