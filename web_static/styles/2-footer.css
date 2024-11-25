@@ -2,9 +2,18 @@ footer {
     background-color: #00FF00;
     height: 60px;
     width: 100%;
+<<<<<<< HEAD
     position: absolute;
     bottom: 0;
     display: flex;
     justify-content: center;
     align-items: center;
 }
+=======
+    bottom: 0;
+    position: fixed;
+    display: flex;
+    justify-content: center;
+    line-height: 60px;
+}
+>>>>>>> 69a4d12c02f81d6fd816341c8371e507b9af3366
