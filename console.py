@@ -1,157 +1,222 @@
 #!/usr/bin/python3
-"""Command interpreter for Holberton AirBnB project
-"""
+
+"""An interactive shell?"""
+
 import cmd
+import re
 import models
+from models.base_model import BaseModel
 from models import storage
-import shlex
-import ast
+import json
+from models.user import User
+from models.place import Place
+from models.state import State
+from models.city import City
+from models.amenity import Amenity
+from models.review import Review
+
+class_home = {
+    "BaseModel": BaseModel,
+    "User": User,
+    "Place": Place,
+    "Amenity": Amenity,
+    "City": City,
+    "Review": Review,
+    "State": State
+}
 
 
 class HBNBCommand(cmd.Cmd):
-    """Command interpreter class"""
+    prompt = '(hbnb)  '
 
-    prompt = '(hbnb) '
-    valid_classes = {'BaseModel', 'User', 'State', 'City',
-                    'Amenity', 'Place', 'Review'}
+    def do_EOF(self, line):
+        """Exits console"""
+        print("")
+        return True
+
+    def do_quit(self, line):
+        """Quit command to exit the program"""
+        print("Good Bye!")
+        return True
+
+    def help_quit(self):
+        """when two arguments involve"""
+        print('\n'.join(["Quit command to exit the program"]))
 
     def emptyline(self):
-        """Do nothing when empty line is entered"""
-        pass
+        """ overwriting the emptyline method """
+        return False
+        # OR
+        # pass
 
-    def do_quit(self, arg):
-        """Quit command to exit the program"""
-        return True
-
-    def do_EOF(self, arg):
-        """EOF command to exit the program"""
-        print()
-        return True
-
-    def do_create(self, arg):
-        """Creates a new instance of a class with given parameters
-        Args:
-            arg (str): Class name and parameters for instance creation
-        """
-        if not arg:
-            print("** class name missing **")
-            return
-        
-        args = arg.split()
-        class_name = args[0]
-        
-        if class_name not in models.classes:
-            print("** class doesn't exist **")
-            return
-        
-        # Extract parameters from arguments
-        params = {}
-        for param in args[1:]:
+    def do_create(self, line):
+        """Creates a new instances of a class"""
+        if line:
             try:
-                key, value = param.split('=', 1)
-                # Handle string with quotes
-                if value.startswith('"') and value.endswith('"'):
-                    value = value[1:-1]  # Remove quotes
-                    value = value.replace('_', ' ')  # Replace _ with space
-                    value = value.replace('\\"', '"')  # Handle escaped quotes
-                    params[key] = value
-                # Handle float
-                elif '.' in value:
-                    try:
-                        params[key] = float(value)
-                    except ValueError:
-                        continue
-                # Handle integer
-                else:
-                    try:
-                        params[key] = int(value)
-                    except ValueError:
-                        continue
-            except ValueError:
-                continue
-        
-        # Create instance with parameters
-        instance = models.classes[class_name](**params)
-        instance.save()
-        print(instance.id)
-
-    def do_show(self, arg):
-        """Prints string representation of an instance"""
-        args = shlex.split(arg)
-        if len(args) == 0:
-            print("** class name missing **")
-            return
-        if args[0] not in models.classes:
-            print("** class doesn't exist **")
-            return
-        if len(args) == 1:
-            print("** instance id missing **")
-            return
-        key = "{}.{}".format(args[0], args[1])
-        if key not in storage.all():
-            print("** no instance found **")
-            return
-        print(storage.all()[key])
-
-    def do_destroy(self, arg):
-        """Deletes an instance based on the class name and id"""
-        args = shlex.split(arg)
-        if len(args) == 0:
-            print("** class name missing **")
-            return
-        if args[0] not in models.classes:
-            print("** class doesn't exist **")
-            return
-        if len(args) == 1:
-            print("** instance id missing **")
-            return
-        key = "{}.{}".format(args[0], args[1])
-        if key not in storage.all():
-            print("** no instance found **")
-            return
-        del storage.all()[key]
-        storage.save()
-
-    def do_all(self, arg):
-        """Prints string representation of all instances"""
-        args = shlex.split(arg)
-        obj_list = []
-        if len(args) == 0:
-            for value in storage.all().values():
-                obj_list.append(str(value))
-        elif args[0] in models.classes:
-            for key in storage.all():
-                if key.split('.')[0] == args[0]:
-                    obj_list.append(str(storage.all()[key]))
+                glo_cls = globals().get(line, None)
+                obj = glo_cls()
+                obj.save()
+                print(obj.id)  # print the id
+            except Exception:
+                print("** class doesn't exist **")
         else:
-            print("** class doesn't exist **")
-            return
-        print(obj_list)
+            print("** class name missing **")
 
-    def do_update(self, arg):
-        """Updates an instance based on the class name and id"""
-        args = shlex.split(arg)
-        if len(args) == 0:
+    def do_show(self, line):
+        """print <class name> <id>"""
+        arr = line.split()    # split & assign to varia
+
+        if len(arr) < 1:
+            print("** class name missing **")
+        elif arr[0] not in class_home:
+            print("** class doesn't exist **")
+        elif len(arr) < 2:
+            print("** instance id missing **")
+        else:
+            new_str = f"{arr[0]}.{arr[1]}"
+            if new_str not in storage.all():
+                print("** no instance found **")
+            else:
+                print(storage.all()[new_str])
+
+    def do_destroy(self, line):
+        """Destroy command deletes an instance based on the class name and id
+        """
+        arr = line.split()
+        if len(arr) < 1:
+            print("** class name missing **")
+        elif arr[0] not in class_home:
+            print("** class doesn't exist **")
+        elif len(arr) < 2:
+            print("** instance id missing **")
+        else:
+            new_str = f"{arr[0]}.{arr[1]}"
+            if new_str not in storage.all().keys():
+                print("** no instance found **")
+            else:
+                storage.all().pop(new_str)
+            #    del (storage.all()[new_str])
+                storage.save()
+
+    # def do_all(self, line):
+    #    """ Print all instances in string representation """
+    #    new_list = []
+
+    #    if not line:
+    #        for key, obj in storage.all().items():
+    #            new_list.append(str(obj))
+    #        print(new_list)
+    #    elif line not in class_home:
+    #        print("** class doesn't exist **")
+    #    else:
+    #        for key, obj in storage.all().items():
+    #            if obj.__class__.__name__ == line:
+    #                new_list.append(str(obj))
+    #        print(new_list)
+
+    def do_all(self, line):
+        """ Print all instances in string representation """
+        objects = []
+        if line == "":
+            print([str(value) for key, value in storage.all().items()])
+        else:
+            st = line.split(" ")
+            if st[0] not in class_home:
+                print("** class doesn't exist **")
+            else:
+                for key, value in storage.all().items():
+                    clas = key.split(".")
+                    if clas[0] == st[0]:
+                        objects.append(str(value))
+                print(objects)
+
+    # def do_all(self, line):
+    #    """ Print all instances in string representation """
+    #    arr = line.split()
+    #    if len(arr) > 0 and arr[0] not in storage.class_dict():
+    #        print("** class doesn't exist **")
+    #    else:
+    #        new_list = []
+    #        for obj in storage.all().values():
+    #            if len(arr) > 0 and arr[0] == obj.__class__.__name__:
+    #                new_list.append(obj.__str__())
+    #            elif len(arr) == 0:
+    #                new_list.append(obj.__str__())
+    #        print(new_list)
+
+    def do_update(self, line):
+        """Update a class instance of a given id by adding or updating
+        a given attribute key/value pair or dictionary.
+        usage:  update <class> <id> <attribute_name> <attribute_value> or
+                <class>.update(<id>, <attribute_name>, <attribute_value>) or
+                <class>.update(<id>, <dictionary>)
+        """
+        arr = line.split()
+        if len(arr) < 1:
             print("** class name missing **")
             return
-        if args[0] not in models.classes:
+        elif arr[0] not in class_home:
             print("** class doesn't exist **")
             return
-        if len(args) == 1:
+        elif len(arr) < 2:
             print("** instance id missing **")
             return
-        key = "{}.{}".format(args[0], args[1])
-        if key not in storage.all():
-            print("** no instance found **")
+        else:
+            new_str = f"{arr[0]}.{arr[1]}"
+            if new_str not in storage.all().keys():
+                print("** no instance found **")
+            elif len(arr) < 3:
+                print("** attribute name missing **")
+                return
+            elif len(arr) < 4:
+                print("** value missing **")
+                return
+            else:
+                setattr(storage.all()[new_str], arr[2], arr[3])
+                storage.save()
+
+    def do_count(self, line):
+        """Print the count all class instances"""
+        kclass = globals().get(line, None)
+        if kclass is None:
+            print("** class doesn't exist **")
             return
-        if len(args) == 2:
-            print("** attribute name missing **")
+        count = 0
+        for obj in storage.all().values():
+            if obj.__class__.__name__ == line:
+                count += 1
+        print(count)
+
+    def default(self, line):
+        if line is None:
             return
-        if len(args) == 3:
-            print("** value missing **")
+
+        cmdPattern = "^([A-Za-z]+)\.([a-z]+)\(([^(]*)\)"
+        paramsPattern = """^"([^"]+)"(?:,\s*(?:"([^"]+)"|(\{[^}]+\}))(?:,\s*(?:("?[^"]+"?)))?)?"""
+        m = re.match(cmdPattern, line)
+        if not m:
+            super().default(line)
             return
-        setattr(storage.all()[key], args[2], ast.literal_eval(args[3]))
-        storage.all()[key].save()
+        mName, method, params = m.groups()
+        m = re.match(paramsPattern, params)
+        params = [item for item in m.groups() if item] if m else []
+
+        cmd = " ".join([mName] + params)
+
+        if method == 'all':
+            return self.do_all(cmd)
+
+        if method == 'count':
+            return self.do_count(cmd)
+
+        if method == 'show':
+            return self.do_show(cmd)
+
+        if method == 'destroy':
+            return self.do_destroy(cmd)
+
+        if method == 'update':
+            return self.do_update(cmd)
 
 
 if __name__ == '__main__':
