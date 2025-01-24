@@ -2,14 +2,14 @@
 """
 Fabric script to distribute an archive to web servers
 """
-from fabric import task
-from fabric.api import env, put, run
+from fabric.api import *
 import os
 
-env.hosts = ['<IP web-01>', '<IP web-02>']
+# SSH configuration
+env.hosts = ['54.157.32.137', '52.55.249.213']
 env.user = 'ubuntu'
+env.key_filename = '~/.ssh/id_rsa'
 
-@task
 def do_deploy(archive_path):
     """
     Distributes an archive to web servers
@@ -20,39 +20,38 @@ def do_deploy(archive_path):
     Returns:
         bool: True if deployment successful, False otherwise
     """
-    # Check if archive file exists
+    # Validate archive existence
     if not os.path.exists(archive_path):
         return False
 
     try:
-        # Get filename without path
-        filename = os.path.basename(archive_path)
-        no_ext = os.path.splitext(filename)[0]
-        
-        # Remote paths
-        remote_tmp_path = f'/tmp/{filename}'
-        remote_release_path = f'/data/web_static/releases/{no_ext}'
-        
-        # Upload archive to remote tmp directory
-        put(archive_path, remote_tmp_path)
-        
+        # Filename parsing
+        basename = os.path.basename(archive_path)
+        name_no_ext = os.path.splitext(basename)[0]
+        remote_path = f'/tmp/{basename}'
+        release_path = f'/data/web_static/releases/{name_no_ext}'
+
+        # Upload archive
+        put(archive_path, remote_path)
+
         # Create release directory
-        run(f'mkdir -p {remote_release_path}')
-        
+        run(f'mkdir -p {release_path}')
+
         # Extract archive
-        run(f'tar -xzf {remote_tmp_path} -C {remote_release_path}')
-        
-        # Remove uploaded archive
-        run(f'rm {remote_tmp_path}')
-        
-        # Move web_static contents 
-        run(f'mv {remote_release_path}/web_static/* {remote_release_path}/')
-        run(f'rm -rf {remote_release_path}/web_static')
-        
+        run(f'tar -xzf {remote_path} -C {release_path}')
+
+        # Clean up remote archive
+        run(f'rm {remote_path}')
+
+        # Move contents
+        run(f'mv {release_path}/web_static/* {release_path}/')
+        run(f'rm -rf {release_path}/web_static')
+
         # Update symbolic link
         run('rm -rf /data/web_static/current')
-        run(f'ln -s {remote_release_path} /data/web_static/current')
-        
+        run(f'ln -s {release_path} /data/web_static/current')
+
         return True
-    except Exception:
+    except Exception as e:
+        print(f"Deployment failed: {e}")
         return False
