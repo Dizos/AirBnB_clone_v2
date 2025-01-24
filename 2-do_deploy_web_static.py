@@ -1,29 +1,31 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
-Fabric script to deploy web static archives
+Fabric script to distribute an archive to web servers
 """
-from fabric import Connection
 from fabric import task
+from fabric.api import env, put, run
 import os
 
+env.hosts = ['<IP web-01>', '<IP web-02>']
+env.user = 'ubuntu'
+
 @task
-def do_deploy(c, archive_path):
+def do_deploy(archive_path):
     """
     Distributes an archive to web servers
     
     Args:
-        c (Connection): Fabric connection
-        archive_path (str): Path to archive file
+        archive_path (str): Path to the archive to be deployed
     
     Returns:
         bool: True if deployment successful, False otherwise
     """
-    # Check if archive exists
+    # Check if archive file exists
     if not os.path.exists(archive_path):
         return False
-    
+
     try:
-        # Get archive filename
+        # Get filename without path
         filename = os.path.basename(archive_path)
         no_ext = os.path.splitext(filename)[0]
         
@@ -31,31 +33,26 @@ def do_deploy(c, archive_path):
         remote_tmp_path = f'/tmp/{filename}'
         remote_release_path = f'/data/web_static/releases/{no_ext}'
         
-        # Upload archive
-        c.put(archive_path, remote_tmp_path)
+        # Upload archive to remote tmp directory
+        put(archive_path, remote_tmp_path)
         
         # Create release directory
-        c.run(f'mkdir -p {remote_release_path}')
+        run(f'mkdir -p {remote_release_path}')
         
-        # Uncompress archive
-        c.run(f'tar -xzf {remote_tmp_path} -C {remote_release_path}')
+        # Extract archive
+        run(f'tar -xzf {remote_tmp_path} -C {remote_release_path}')
         
         # Remove uploaded archive
-        c.run(f'rm {remote_tmp_path}')
+        run(f'rm {remote_tmp_path}')
         
-        # Move contents
-        c.run(f'mv {remote_release_path}/web_static/* {remote_release_path}/')
-        c.run(f'rm -rf {remote_release_path}/web_static')
+        # Move web_static contents 
+        run(f'mv {remote_release_path}/web_static/* {remote_release_path}/')
+        run(f'rm -rf {remote_release_path}/web_static')
         
         # Update symbolic link
-        c.run('rm -rf /data/web_static/current')
-        c.run(f'ln -s {remote_release_path} /data/web_static/current')
+        run('rm -rf /data/web_static/current')
+        run(f'ln -s {remote_release_path} /data/web_static/current')
         
         return True
     except Exception:
         return False
-
-# Hosts configuration
-env.hosts = ['<IP web-01>', '<IP web-02>']
-env.user = 'ubuntu'
-env.key_filename = 'path/to/private_key'
