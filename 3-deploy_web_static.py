@@ -1,94 +1,85 @@
 #!/usr/bin/python3
 """
-Fabric script that creates and distributes an archive to web servers
+Fabric script to pack and deploy web_static to web servers
 """
-
-from fabric.api import env, local, put, run
-from datetime import datetime
+from fabric.api import *
 import os
-
-env.hosts = ['<IP web-01>', 'IP web-02']
-
+from datetime import datetime
 
 def do_pack():
     """
-    Generates a .tgz archive from the contents of web_static folder
+    Creates a compressed archive of web_static folder
+    
+    Returns:
+        str: Path to created archive, or None if failed
     """
+    # Ensure versions directory exists
+    local('mkdir -p versions')
+    
+    # Generate archive name with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    archive_path = f'versions/web_static_{timestamp}.tgz'
+    
     try:
-        if not os.path.exists("versions"):
-            local("mkdir -p versions")
+        # Create compressed archive
+        local(f'tar -czvf {archive_path} web_static')
         
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        archive_path = "versions/web_static_{}.tgz".format(timestamp)
-        
-        local("tar -cvzf {} web_static".format(archive_path))
         return archive_path
-    except:
+    except Exception:
         return None
-
 
 def do_deploy(archive_path):
     """
     Distributes an archive to web servers
     
     Args:
-        archive_path: path to the archive to deploy
+        archive_path (str): Path to archive to deploy
     
     Returns:
-        True if successful, False otherwise
+        bool: True if deployment successful, False otherwise
     """
     if not os.path.exists(archive_path):
         return False
 
     try:
-        # Extract filename and folder name from archive path
-        file_name = os.path.basename(archive_path)
-        folder_name = file_name.replace('.tgz', '')
-        
-        # Upload archive to /tmp/ directory on server
-        put(archive_path, '/tmp/{}'.format(file_name))
-        
-        # Create directory for release
-        run('mkdir -p /data/web_static/releases/{}/'.format(folder_name))
-        
-        # Extract archive to the releases folder
-        run('tar -xzf /tmp/{} -C /data/web_static/releases/{}/'.format(
-            file_name, folder_name))
-        
-        # Remove the uploaded archive
-        run('rm /tmp/{}'.format(file_name))
-        
-        # Move contents from web_static folder to release folder
-        run('mv /data/web_static/releases/{}/web_static/* '
-            '/data/web_static/releases/{}/'.format(folder_name, folder_name))
-        
-        # Remove the now-empty web_static folder
-        run('rm -rf /data/web_static/releases/{}/web_static'.format(folder_name))
-        
-        # Remove current symbolic link if it exists
-        run('rm -rf /data/web_static/current')
-        
-        # Create new symbolic link
-        run('ln -s /data/web_static/releases/{}/ /data/web_static/current'.format(
-            folder_name))
-        
-        print('New version deployed!')
-        return True
-    except:
-        return False
+        # Filename parsing
+        basename = os.path.basename(archive_path)
+        name_no_ext = os.path.splitext(basename)[0]
+        remote_path = f'/tmp/{basename}'
+        release_path = f'/data/web_static/releases/{name_no_ext}'
 
+        # Upload and deploy
+        put(archive_path, remote_path)
+        run(f'mkdir -p {release_path}')
+        run(f'tar -xzf {remote_path} -C {release_path}')
+        run(f'rm {remote_path}')
+        run(f'mv {release_path}/web_static/* {release_path}/')
+        run(f'rm -rf {release_path}/web_static')
+        run('rm -rf /data/web_static/current')
+        run(f'ln -s {release_path} /data/web_static/current')
+
+        return True
+    except Exception:
+        return False
 
 def deploy():
     """
-    Creates and distributes an archive to web servers
+    Create and distribute archive to web servers
     
     Returns:
-        True if successful, False otherwise
+        bool: True if deployment successful, False otherwise
     """
-    # Create archive
+    # Pack the archive
     archive_path = do_pack()
+    
+    # Check if packing was successful
     if not archive_path:
         return False
     
-    # Deploy archive
+    # Deploy to servers
     return do_deploy(archive_path)
+
+# SSH configuration
+env.hosts = ['54.157.32.137', '52.55.249.213']
+env.user = 'ubuntu'
+env.key_filename = '~/.ssh/id_rsa'
